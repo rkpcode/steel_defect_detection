@@ -1,45 +1,25 @@
 from setuptools import setup, find_packages
-import pathlib
-import io
-import os
-
-HERE = pathlib.Path(__file__).parent
-
-
-def read_requirements(path=HERE / "requirements.txt"):
-    """Read requirements.txt and return a list suitable for install_requires.
-
-    Ignores blank lines and comments. If the file is missing, returns an empty list.
-    """
-    if not path.exists():
-        return []
-    reqs = []
-    with io.open(path, encoding="utf-8") as fh:
-        for line in fh:
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            reqs.append(line)
-    return reqs
-
-
-# Read long description from README if available
-long_description = ""
-readme = HERE / "README.md"
-if readme.exists():
-    long_description = readme.read_text(encoding="utf-8")
-
 
 setup(
     name="steel_defect_detection_system",
     version="0.0.1",
     description="Steel Defect Detection System using Computer Vision",
-    long_description=long_description,
-    long_description_content_type="text/markdown",
     author="rkpcode",
     package_dir={"": "src"},
     packages=find_packages(where="src"),
     include_package_data=True,
-    install_requires=read_requirements(),
+    install_requires=[
+        "numpy>=1.21.0",
+        "pandas>=1.3.0",
+        "scikit-learn>=1.0.0",
+        "opencv-python>=4.5.0",
+        "matplotlib>=3.4.0",
+        "seaborn>=0.11.0",
+        "Pillow>=8.0.0",
+        "tensorflow>=2.10.0",
+        "albumentations>=1.0.0",
+        "tqdm",
+        "kaggle",
+    ],
     python_requires=">=3.8",
 )
