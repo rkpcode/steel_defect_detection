@@ -33,7 +33,7 @@ if readme.exists():
 setup(
     name="steel_defect_detection_system",
     version="0.0.1",
-    description="A forecasting system for Nifty 50 stock market index",
+    description="Steel Defect Detection System using Computer Vision",
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="rkpcode",
