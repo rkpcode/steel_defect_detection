@@ -1,0 +1,6 @@
+outs:
+- md5: 3403018eed61260030d78baaa28f58b0.dir
+  size: 207627
+  nfiles: 8
+  hash: md5
+  path: training_logs

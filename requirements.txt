@@ -1,0 +1,26 @@
+# --- Core Data Science ---
+numpy>=1.21.0
+pandas>=1.3.0
+scikit-learn>=1.0.0
+
+# --- Image Processing & Visualization ---
+opencv-python>=4.5.0
+matplotlib>=3.4.0
+seaborn>=0.11.0
+Pillow>=8.0.0
+
+# --- Deep Learning (TensorFlow/Keras) ---
+tensorflow>=2.10.0  # Includes Keras
+# Note: For Windows Native GPU support, WSL2 is recommended now, 
+# but this standard package works for CPU & Linux GPU.
+
+# --- The "Secret Weapons" for Segmentation (Keras Version) ---
+# Yeh library Keras ke liye hai. Isse U-Net + ResNet34 ek line mein ban jayega.
+segmentation-models>=1.0.1
+
+# Best library for image augmentation (TF ke built-in augs se better hai masks ke liye)
+albumentations>=1.0.0
+
+# --- Utilities ---
+tqdm            # For progress bars
+kaggle          # For dataset download
