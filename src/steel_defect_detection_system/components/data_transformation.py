@@ -340,6 +340,110 @@ class DataTransformation:
         
         return X, y, meta_df
     
+    def save_patches_to_disk(self, df: pd.DataFrame, output_dir: str, 
+                              prefix: str = "train", max_images: int = None) -> pd.DataFrame:
+        """
+        MEMORY-EFFICIENT: Save patches to disk instead of keeping in memory.
+        
+        Args:
+            df: DataFrame with ImageId and RLE columns
+            output_dir: Directory to save patches
+            prefix: Prefix for file naming (train/test)
+            max_images: Optional limit
+        
+        Returns:
+            DataFrame with patch file paths and labels
+        """
+        import gc
+        
+        os.makedirs(output_dir, exist_ok=True)
+        logger.info(f"Saving patches to disk: {output_dir}")
+        
+        metadata = []
+        patch_count = 0
+        
+        unique_images = df['ImageId'].unique()
+        if max_images:
+            unique_images = unique_images[:max_images]
+        
+        for idx, image_id in enumerate(unique_images):
+            if idx % 100 == 0:
+                logger.info(f"Processing image {idx+1}/{len(unique_images)}")
+                gc.collect()  # Free memory periodically
+            
+            # Get all rows for this image
+            image_rows = df[df['ImageId'] == image_id]
+            
+            # Combine into single row
+            combined_row = pd.Series({'ImageId': image_id})
+            for _, row in image_rows.iterrows():
+                class_id = row.get('ClassId', row.get('primary_class', 0))
+                if pd.notna(row.get('EncodedPixels')):
+                    combined_row[f'rle_class_{class_id}'] = row['EncodedPixels']
+            
+            # Process image into patches
+            patches = self.process_single_image(image_id, combined_row)
+            
+            # Save each patch to disk
+            for patch in patches:
+                patch_file = os.path.join(output_dir, f"{prefix}_{patch_count:06d}.npy")
+                np.save(patch_file, patch['image'].astype(np.float32))
+                
+                metadata.append({
+                    'file_path': patch_file,
+                    'image_id': patch['image_id'],
+                    'patch_idx': patch['patch_idx'],
+                    'label': patch['label'],
+                    'defect_ratio': patch['defect_ratio']
+                })
+                patch_count += 1
+        
+        meta_df = pd.DataFrame(metadata)
+        
+        # Save metadata
+        meta_path = os.path.join(output_dir, f"{prefix}_metadata.csv")
+        meta_df.to_csv(meta_path, index=False)
+        
+        n_defective = meta_df['label'].sum()
+        logger.info(f"Saved {len(meta_df)} patches to disk")
+        logger.info(f"Defective: {n_defective} ({n_defective/len(meta_df)*100:.1f}%)")
+        
+        return meta_df
+    
+    def create_generator_dataset(self, meta_df: pd.DataFrame, 
+                                  augmentation: SafeAugmentation,
+                                  shuffle: bool = True) -> tf.data.Dataset:
+        """
+        Create TensorFlow Dataset from disk-saved patches using generator.
+        
+        MEMORY-EFFICIENT: Loads patches one at a time from disk.
+        """
+        file_paths = meta_df['file_path'].values
+        labels = meta_df['label'].values
+        
+        def generator():
+            indices = np.arange(len(file_paths))
+            if shuffle:
+                np.random.shuffle(indices)
+            
+            for idx in indices:
+                patch = np.load(file_paths[idx])
+                patch = augmentation(patch).astype(np.float32)
+                yield patch, labels[idx]
+        
+        dataset = tf.data.Dataset.from_generator(
+            generator,
+            output_signature=(
+                tf.TensorSpec(shape=(self.config.patch_height, self.config.patch_width, 3), dtype=tf.float32),
+                tf.TensorSpec(shape=(), dtype=tf.int64)
+            )
+        )
+        
+        dataset = dataset.batch(self.config.batch_size)
+        dataset = dataset.prefetch(self.config.prefetch_buffer)
+        
+        return dataset
+    
     def calculate_class_weights(self, y: np.ndarray) -> Dict[int, float]:
         """
         Calculate class weights for imbalanced patch labels.
@@ -468,6 +572,87 @@ class DataTransformation:
                 'class_weights': class_weights,
                 'train_meta': train_meta,
                 'test_meta': test_meta
+            }
+            
+        except Exception as e:
+            raise CustomException(e, sys)
+    
+    def initiate_data_transformation_memory_efficient(self, train_path: str, test_path: str,
+                                                       max_train_images: int = None,
+                                                       max_test_images: int = None) -> Dict:
+        """
+        MEMORY-EFFICIENT: Data transformation using disk-based patch storage.
+        
+        Use this for full dataset training when RAM is limited.
+        Patches are saved to disk and loaded on-demand via generators.
+        
+        Args:
+            train_path: Path to train CSV
+            test_path: Path to test CSV
+            max_train_images: Optional limit
+            max_test_images: Optional limit
+        
+        Returns:
+            Dictionary with datasets and metadata (no X_train/X_test arrays!)
+        """
+        try:
+            logger.info("=" * 60)
+            logger.info("STARTING MEMORY-EFFICIENT DATA TRANSFORMATION")
+            logger.info("=" * 60)
+            
+            # Load CSVs
+            train_df = pd.read_csv(train_path)
+            test_df = pd.read_csv(test_path)
+            
+            logger.info(f"Train images: {train_df['ImageId'].nunique()}")
+            logger.info(f"Test images: {test_df['ImageId'].nunique()}")
+            
+            # Save patches to disk
+            train_patches_dir = os.path.join(self.config.patches_dir, "train")
+            test_patches_dir = os.path.join(self.config.patches_dir, "test")
+            
+            logger.info("\n--- Processing Training Data (saving to disk) ---")
+            train_meta = self.save_patches_to_disk(
+                train_df, train_patches_dir, prefix="train", max_images=max_train_images
+            )
+            
+            logger.info("\n--- Processing Test Data (saving to disk) ---")
+            test_meta = self.save_patches_to_disk(
+                test_df, test_patches_dir, prefix="test", max_images=max_test_images
+            )
+            
+            # Calculate class weights from metadata
+            y_train = train_meta['label'].values
+            class_weights = self.calculate_class_weights(y_train)
+            
+            # Create generator-based TF Datasets
+            logger.info("\n--- Creating Generator-based TensorFlow Datasets ---")
+            train_dataset = self.create_generator_dataset(
+                train_meta, self.train_augmentation, shuffle=True
+            )
+            test_dataset = self.create_generator_dataset(
+                test_meta, self.val_augmentation, shuffle=False
+            )
+            
+            logger.info("=" * 60)
+            logger.info("MEMORY-EFFICIENT DATA TRANSFORMATION COMPLETE")
+            logger.info("=" * 60)
+            
+            # For evaluation, we need to load test patches (smaller set)
+            X_test = np.array([np.load(f) for f in test_meta['file_path'].values])
+            y_test = test_meta['label'].values
+            
+            return {
+                'train_dataset': train_dataset,
+                'test_dataset': test_dataset,
+                'X_train': None,  # Not stored in memory
+                'y_train': y_train,
+                'X_test': X_test,
+                'y_test': y_test,
+                'class_weights': class_weights,
+                'train_meta': train_meta,
+                'test_meta': test_meta,
+                'memory_efficient': True
             }
             
         except Exception as e:

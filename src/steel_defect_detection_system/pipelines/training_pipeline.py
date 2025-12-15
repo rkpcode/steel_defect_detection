@@ -77,7 +77,8 @@ class TrainingPipeline:
     
     def run_step_2_data_transformation(self, train_path: str, test_path: str,
                                         max_train_images: int = None,
-                                        max_test_images: int = None):
+                                        max_test_images: int = None,
+                                        memory_efficient: bool = False):
         """
         STEP 2: Data Transformation
         
@@ -91,6 +92,7 @@ class TrainingPipeline:
             test_path: Path to test CSV
             max_train_images: Limit training images (for testing)
             max_test_images: Limit test images (for testing)
+            memory_efficient: Use disk-based approach for large datasets
         """
         logger.info("=" * 60)
         logger.info("STEP 2: DATA TRANSFORMATION")
@@ -98,16 +100,29 @@ class TrainingPipeline:
         
         try:
             transformer = DataTransformation(self.transformation_config)
-            result = transformer.initiate_data_transformation(
-                train_path=train_path,
-                test_path=test_path,
-                max_train_images=max_train_images,
-                max_test_images=max_test_images
-            )
             
-            logger.info(f"\n[OK] Step 2 Complete!")
-            logger.info(f"   Train patches: {len(result['X_train'])}")
-            logger.info(f"   Test patches: {len(result['X_test'])}")
+            if memory_efficient:
+                logger.info("Using MEMORY-EFFICIENT mode (disk-based)")
+                result = transformer.initiate_data_transformation_memory_efficient(
+                    train_path=train_path,
+                    test_path=test_path,
+                    max_train_images=max_train_images,
+                    max_test_images=max_test_images
+                )
+                logger.info(f"\n[OK] Step 2 Complete!")
+                logger.info(f"   Train patches: {len(result['y_train'])}")
+                logger.info(f"   Test patches: {len(result['X_test'])}")
+            else:
+                result = transformer.initiate_data_transformation(
+                    train_path=train_path,
+                    test_path=test_path,
+                    max_train_images=max_train_images,
+                    max_test_images=max_test_images
+                )
+                logger.info(f"\n[OK] Step 2 Complete!")
+                logger.info(f"   Train patches: {len(result['X_train'])}")
+                logger.info(f"   Test patches: {len(result['X_test'])}")
+            
             logger.info(f"   Class weights: {result['class_weights']}")
             
             return result
@@ -210,7 +225,8 @@ class TrainingPipeline:
     
     def run_pipeline(self, max_train_images: int = None, max_test_images: int = None,
                      model_type: str = "baseline", epochs: int = 10, 
-                     skip_training: bool = False, skip_evaluation: bool = False):
+                     skip_training: bool = False, skip_evaluation: bool = False,
+                     memory_efficient: bool = False):
         """
         Run complete training pipeline.
         
@@ -221,6 +237,7 @@ class TrainingPipeline:
             epochs: Training epochs
             skip_training: Skip Step 3 (for data testing only)
             skip_evaluation: Skip Step 4 (for training only)
+            memory_efficient: Use disk-based approach for large datasets
         """
         logger.info("=" * 60)
         logger.info("STARTING TRAINING PIPELINE")
@@ -235,7 +252,8 @@ class TrainingPipeline:
             train_path=train_path,
             test_path=test_path,
             max_train_images=max_train_images,
-            max_test_images=max_test_images
+            max_test_images=max_test_images,
+            memory_efficient=memory_efficient
         )
         
         # Step 3: Model Training
