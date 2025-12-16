@@ -310,12 +310,23 @@ class DataTransformation:
             # Get all rows for this image (may have multiple defect classes)
             image_rows = df[df['ImageId'] == image_id]
             
-            # Combine into single row with all RLEs
+            # Build combined row with RLE data
             combined_row = pd.Series({'ImageId': image_id})
-            for _, row in image_rows.iterrows():
-                class_id = row.get('ClassId', row.get('primary_class', 0))
-                if pd.notna(row.get('EncodedPixels')):
-                    combined_row[f'rle_class_{class_id}'] = row['EncodedPixels']
+            
+            # Check if processed format (has rle_class_X) or raw format (has EncodedPixels)
+            if 'rle_class_1' in df.columns:
+                # Processed CSV format - use directly
+                first_row = image_rows.iloc[0]
+                for class_id in [1, 2, 3, 4]:
+                    col = f'rle_class_{class_id}'
+                    if col in first_row and pd.notna(first_row[col]):
+                        combined_row[col] = first_row[col]
+            else:
+                # Raw CSV format - combine from multiple rows
+                for _, row in image_rows.iterrows():
+                    class_id = row.get('ClassId', row.get('primary_class', 0))
+                    if pd.notna(row.get('EncodedPixels')):
+                        combined_row[f'rle_class_{class_id}'] = row['EncodedPixels']
             
             # Process image into patches
             patches = self.process_single_image(image_id, combined_row)
@@ -374,12 +385,24 @@ class DataTransformation:
             # Get all rows for this image
             image_rows = df[df['ImageId'] == image_id]
             
-            # Combine into single row
+            # Build combined row with RLE data
+            # Processed CSV already has rle_class_X columns
             combined_row = pd.Series({'ImageId': image_id})
-            for _, row in image_rows.iterrows():
-                class_id = row.get('ClassId', row.get('primary_class', 0))
-                if pd.notna(row.get('EncodedPixels')):
-                    combined_row[f'rle_class_{class_id}'] = row['EncodedPixels']
+            
+            # Check if processed format (has rle_class_X) or raw format (has EncodedPixels)
+            if 'rle_class_1' in df.columns:
+                # Processed CSV format - use directly
+                first_row = image_rows.iloc[0]
+                for class_id in [1, 2, 3, 4]:
+                    col = f'rle_class_{class_id}'
+                    if col in first_row and pd.notna(first_row[col]):
+                        combined_row[col] = first_row[col]
+            else:
+                # Raw CSV format - combine from multiple rows
+                for _, row in image_rows.iterrows():
+                    class_id = row.get('ClassId', row.get('primary_class', 0))
+                    if pd.notna(row.get('EncodedPixels')):
+                        combined_row[f'rle_class_{class_id}'] = row['EncodedPixels']
             
             # Process image into patches
             patches = self.process_single_image(image_id, combined_row)
