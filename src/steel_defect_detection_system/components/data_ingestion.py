@@ -19,8 +19,8 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-from steel_defect_detection_system.exception import CustomException
-from steel_defect_detection_system.logger import logger
+from src.steel_defect_detection_system.exception import CustomException
+from src.steel_defect_detection_system.logger import logger
 
 
 @dataclass

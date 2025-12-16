@@ -12,27 +12,12 @@ Step-by-step pipeline:
 import os
 import sys
 from pathlib import Path
-
-# Add project root to path
-project_root = Path(__file__).parent.parent.parent.parent
-sys.path.insert(0, str(project_root / "src"))
-
-from steel_defect_detection_system.logger import logger
-from steel_defect_detection_system.exception import CustomException
-from steel_defect_detection_system.components.data_ingestion import (
-    DataIngestion, DataIngestionConfig
-)
-from steel_defect_detection_system.components.data_transformation import (
-    DataTransformation, DataTransformationConfig
-)
-from steel_defect_detection_system.components.model_trainer import (
-    ModelTrainer, ModelTrainerConfig
-)
-from steel_defect_detection_system.components.model_evaluation import (
-    ModelEvaluation, ModelEvaluationConfig
-)
-
-
+from src.steel_defect_detection_system.logger import logger
+from src.steel_defect_detection_system.exception import CustomException
+from src.steel_defect_detection_system.components.data_ingestion import DataIngestion, DataIngestionConfig
+from src.steel_defect_detection_system.components.data_transformation import DataTransformation, DataTransformationConfig
+from src.steel_defect_detection_system.components.model_trainer import ModelTrainer, ModelTrainerConfig
+from src.steel_defect_detection_system.components.model_evaluation import ModelEvaluation, ModelEvaluationConfig
 class TrainingPipeline:
     """
     End-to-end training pipeline for Steel Defect Detection.

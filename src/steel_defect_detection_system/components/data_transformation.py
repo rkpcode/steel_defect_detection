@@ -28,9 +28,9 @@ import tensorflow as tf
 from PIL import Image
 import albumentations as A
 
-from steel_defect_detection_system.exception import CustomException
-from steel_defect_detection_system.logger import logger
-from steel_defect_detection_system.utils import rle_to_mask
+from src.steel_defect_detection_system.exception import CustomException
+from src.steel_defect_detection_system.logger import logger
+from src.steel_defect_detection_system.utils import rle_to_mask
 
 
 @dataclass

@@ -16,7 +16,7 @@
 ### Confusion Matrix
 | | Predicted Clean | Predicted Defective |
 |---|---|---|
-| **Actual Clean** | TN=13 | FP=42 |
+| **Actual Clean** | TN=55 | FP=0 |
 | **Actual Defective** | FN=0 | TP=0 |
 
 > [!WARNING]
@@ -24,7 +24,7 @@
 
 ---
 
-## 2. Optimal Threshold (0.342) Results
+## 2. Optimal Threshold (0.000) Results
 
 | Metric | Value | Change |
 |--------|-------|--------|
@@ -53,7 +53,7 @@
 - False alarms are acceptable (manual inspection)
 - Missed defects are NOT acceptable
 
-**Selected Threshold:** `0.342`
+**Selected Threshold:** `0.000`
 
 ---
 

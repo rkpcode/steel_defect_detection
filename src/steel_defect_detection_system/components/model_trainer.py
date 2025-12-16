@@ -26,8 +26,8 @@ from tensorflow import keras
 from tensorflow.keras import layers, models, callbacks
 from tensorflow.keras.applications import ResNet50, EfficientNetB0
 
-from steel_defect_detection_system.exception import CustomException
-from steel_defect_detection_system.logger import logger
+from src.steel_defect_detection_system.exception import CustomException
+from src.steel_defect_detection_system.logger import logger
 
 
 @dataclass
