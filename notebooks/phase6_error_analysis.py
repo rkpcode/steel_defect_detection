@@ -2,13 +2,8 @@
 Phase 6: Error Analysis - Steel Defect Detection System
 ========================================================
 
-This notebook analyzes model errors (False Negatives and False Positives)
-to understand failure modes and identify improvement opportunities.
-
-Key Questions:
-1. What types of defects are being missed? (FN analysis)
-2. What clean areas are incorrectly flagged? (FP analysis)
-3. Are there systematic patterns in the errors?
+Memory-efficient error analysis with proper preprocessing.
+Analyzes False Negatives and False Positives with visualizations.
 """
 
 import sys
@@ -23,17 +18,12 @@ sys.path.insert(0, str(project_root / 'src'))
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from PIL import Image
 import tensorflow as tf
+import albumentations as A
+import gc
 
-from steel_defect_detection_system.pipelines.training_pipeline import TrainingPipeline
-from steel_defect_detection_system.components.model_evaluation import ModelEvaluation
-
-# ============================================
-# 1. Load Model and Test Data
-# ============================================
 print("=" * 60)
-print("PHASE 6: ERROR ANALYSIS")
+print("PHASE 6: ERROR ANALYSIS (Memory Efficient)")
 print("=" * 60)
 
 # Custom metric for model loading
@@ -47,34 +37,65 @@ def f2_score(y_true, y_pred):
     recall = tp / (tp + fn + 1e-7)
     return (5 * precision * recall) / (4 * precision + recall + 1e-7)
 
+# Preprocessing (MUST match training)
+normalize = A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+
+def preprocess(image):
+    """Apply same preprocessing as training"""
+    return normalize(image=image)['image']
+
+def denormalize(image):
+    """Reverse normalization for visualization"""
+    mean = np.array([0.485, 0.456, 0.406])
+    std = np.array([0.229, 0.224, 0.225])
+    img = image * std + mean
+    return np.clip(img, 0, 1)
+
+# ============================================
+# 1. Load Model and Test Data
+# ============================================
 print("\nLoading model...")
 model = tf.keras.models.load_model(
     'artifacts/models/transfer_model_stage1_best.keras',
     custom_objects={'f2_score': f2_score}
 )
 
+# Load test metadata
 print("Loading test data...")
-pipeline = TrainingPipeline()
-result = pipeline.run_step_2_data_transformation(
-    train_path='artifacts/data/processed/train.csv',
-    test_path='artifacts/data/processed/test.csv',
-    max_train_images=5,
-    max_test_images=None
-)
-X_test = result['X_test']
-y_test = result['y_test']
+test_meta_path = 'artifacts/data/patches/test/test_metadata.csv'
 
-print(f"\nTest samples: {len(X_test)}")
-print(f"Defective: {sum(y_test)} ({sum(y_test)/len(y_test)*100:.1f}%)")
-print(f"Clean: {len(y_test) - sum(y_test)} ({(len(y_test)-sum(y_test))/len(y_test)*100:.1f}%)")
+if os.path.exists(test_meta_path):
+    test_meta = pd.read_csv(test_meta_path)
+    y_test = test_meta['label'].values
+    
+    print(f"\nTest samples: {len(y_test)}")
+    print(f"Defective: {sum(y_test)} ({sum(y_test)/len(y_test)*100:.1f}%)")
+    print(f"Clean: {len(y_test) - sum(y_test)} ({(len(y_test)-sum(y_test))/len(y_test)*100:.1f}%)")
+    
+    # ============================================
+    # 2. Generate Predictions (batch-wise)
+    # ============================================
+    print("\nGenerating predictions...")
+    y_pred_proba = []
+    batch_size = 200
+    
+    for i in range(0, len(test_meta), batch_size):
+        batch_paths = test_meta['file_path'].values[i:i+batch_size]
+        X_batch = np.array([preprocess(np.load(p)) for p in batch_paths])
+        preds = model.predict(X_batch, verbose=0).flatten()
+        y_pred_proba.extend(preds)
+        del X_batch
+        gc.collect()
+        if i % 2000 == 0:
+            print(f"Progress: {i}/{len(test_meta)}")
+    
+    y_pred_proba = np.array(y_pred_proba)
+    
+else:
+    print("ERROR: Patches not found. Run pipeline first!")
+    exit(1)
 
-# ============================================
-# 2. Generate Predictions
-# ============================================
-print("\nGenerating predictions...")
-y_pred_proba = model.predict(X_test, verbose=1).flatten()
-
-# Use optimal threshold (from evaluation)
+# Use optimal threshold
 THRESHOLD = 0.3
 y_pred = (y_pred_proba >= THRESHOLD).astype(int)
 
@@ -122,9 +143,9 @@ if len(fn_indices) > 0:
     
     for i, idx in enumerate(fn_indices[:n_samples]):
         ax = axes[i // 5, i % 5]
-        # Normalize for display: scale min-max to 0-1
-        img = X_test[idx].copy()
-        img = (img - img.min()) / (img.max() - img.min() + 1e-8)
+        # Load and denormalize for display
+        img_raw = np.load(test_meta['file_path'].values[idx])
+        img = (img_raw - img_raw.min()) / (img_raw.max() - img_raw.min() + 1e-8)
         ax.imshow(img)
         ax.set_title(f'Prob: {y_pred_proba[idx]:.3f}\nActual: Defect')
         ax.axis('off')
@@ -162,9 +183,9 @@ if len(fp_indices) > 0:
     
     for i, idx in enumerate(fp_indices[:n_samples]):
         ax = axes[i // 5, i % 5]
-        # Normalize for display: scale min-max to 0-1
-        img = X_test[idx].copy()
-        img = (img - img.min()) / (img.max() - img.min() + 1e-8)
+        # Load and normalize for display
+        img_raw = np.load(test_meta['file_path'].values[idx])
+        img = (img_raw - img_raw.min()) / (img_raw.max() - img_raw.min() + 1e-8)
         ax.imshow(img)
         ax.set_title(f'Prob: {y_pred_proba[idx]:.3f}\nActual: Clean')
         ax.axis('off')
