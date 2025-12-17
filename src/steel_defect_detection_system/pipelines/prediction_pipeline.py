@@ -73,6 +73,22 @@ class PredictionPipeline:
         self._load_model()
         logger.info("PredictionPipeline initialized")
     
+    def _f2_score(self, y_true, y_pred):
+        """F2-Score: Custom metric for model loading"""
+        y_true = tf.cast(y_true, tf.float32)
+        y_pred = tf.cast(y_pred > 0.5, tf.float32)
+        
+        tp = tf.reduce_sum(y_true * y_pred)
+        fp = tf.reduce_sum((1 - y_true) * y_pred)
+        fn = tf.reduce_sum(y_true * (1 - y_pred))
+        
+        precision = tp / (tp + fp + tf.keras.backend.epsilon())
+        recall = tp / (tp + fn + tf.keras.backend.epsilon())
+        
+        beta = 2.0
+        f2 = (1 + beta**2) * (precision * recall) / (beta**2 * precision + recall + tf.keras.backend.epsilon())
+        return f2
+    
     def _load_model(self) -> None:
         """Load trained model"""
         model_path = os.path.join(self.config.model_dir, self.config.model_name)
@@ -93,7 +109,8 @@ class PredictionPipeline:
                 raise FileNotFoundError(f"No model found in {self.config.model_dir}")
         
         logger.info(f"Loading model from: {model_path}")
-        self.model = tf.keras.models.load_model(model_path)
+        custom_objects = {'f2_score': self._f2_score}
+        self.model = tf.keras.models.load_model(model_path, custom_objects=custom_objects)
         logger.info("Model loaded successfully")
     
     def load_image(self, image_path: str) -> np.ndarray:

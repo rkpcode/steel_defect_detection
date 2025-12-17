@@ -125,6 +125,27 @@ st.markdown("""
 
 
 # ============================================
+# Custom Metrics (must match training)
+# ============================================
+def f2_score(y_true, y_pred):
+    """F2-Score: Emphasizes recall over precision"""
+    import tensorflow as tf
+    y_true = tf.cast(y_true, tf.float32)
+    y_pred = tf.cast(y_pred > 0.5, tf.float32)
+    
+    tp = tf.reduce_sum(y_true * y_pred)
+    fp = tf.reduce_sum((1 - y_true) * y_pred)
+    fn = tf.reduce_sum(y_true * (1 - y_pred))
+    
+    precision = tp / (tp + fp + tf.keras.backend.epsilon())
+    recall = tp / (tp + fn + tf.keras.backend.epsilon())
+    
+    beta = 2.0
+    f2 = (1 + beta**2) * (precision * recall) / (beta**2 * precision + recall + tf.keras.backend.epsilon())
+    return f2
+
+
+# ============================================
 # Model Loading (Cached)
 # ============================================
 @st.cache_resource
@@ -137,9 +158,11 @@ def load_model():
         "artifacts/models/baseline_model_best.keras"
     ]
     
+    custom_objects = {'f2_score': f2_score}
+    
     for path in model_paths:
         if os.path.exists(path):
-            model = tf.keras.models.load_model(path)
+            model = tf.keras.models.load_model(path, custom_objects=custom_objects)
             return model, path
     
     return None, None
@@ -286,7 +309,10 @@ def main():
         image_to_process = None
         
         if uploaded_file is not None:
-            image = Image.open(uploaded_file)
+            # Read file bytes first
+            bytes_data = uploaded_file.read()
+            from io import BytesIO
+            image = Image.open(BytesIO(bytes_data))
             image_to_process = np.array(image)
             st.image(image, caption="Uploaded Image", use_container_width=True)
             
