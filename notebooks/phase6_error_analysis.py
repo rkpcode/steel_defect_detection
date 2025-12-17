@@ -59,7 +59,7 @@ result = pipeline.run_step_2_data_transformation(
     train_path='artifacts/data/processed/train.csv',
     test_path='artifacts/data/processed/test.csv',
     max_train_images=5,
-    max_test_images=100
+    max_test_images=None
 )
 X_test = result['X_test']
 y_test = result['y_test']
