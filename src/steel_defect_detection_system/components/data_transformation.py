@@ -682,20 +682,3 @@ class DataTransformation:
             raise CustomException(e, sys)
 
 
-if __name__ == "__main__":
-    # Test data transformation
-    config = DataTransformationConfig()
-    transformer = DataTransformation(config)
-    
-    # Run with small sample
-    result = transformer.initiate_data_transformation(
-        train_path="artifacts/data/processed/train.csv",
-        test_path="artifacts/data/processed/test.csv",
-        max_train_images=10,  # Small test
-        max_test_images=5
-    )
-    
-    print(f"\nTransformation complete!")
-    print(f"Train patches: {len(result['X_train'])}")
-    print(f"Test patches: {len(result['X_test'])}")
-    print(f"Class weights: {result['class_weights']}")
