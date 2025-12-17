@@ -1,0 +1,26 @@
+Phase 6: Error Analysis Summary
+================================
+
+Threshold: 0.3
+Total Samples: 1100
+
+Confusion Matrix:
+- True Positives: 40
+- True Negatives: 522
+- False Positives: 152
+- False Negatives: 386
+
+Metrics:
+- Accuracy: 0.5109
+- Precision: 0.2083
+- Recall: 0.0939
+- F2-Score: 0.1055
+
+Error Rates:
+- FN Rate (Miss Rate): 90.61%
+- FP Rate (False Alarm): 22.55%
+
+Output Files:
+- false_negatives.png
+- false_positives.png
+- probability_distribution.png

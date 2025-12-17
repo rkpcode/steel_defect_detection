@@ -29,7 +29,6 @@ from tensorflow.keras.applications import ResNet50, EfficientNetB0
 from src.steel_defect_detection_system.exception import CustomException
 from src.steel_defect_detection_system.logger import logger
 
-
 @dataclass
 class ModelTrainerConfig:
     """Configuration for model training"""

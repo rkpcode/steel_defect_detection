@@ -146,11 +146,28 @@ def f2_score(y_true, y_pred):
 
 
 # ============================================
-# Model Loading (Cached)
+# Model Loading (Cached) with Google Drive Support
 # ============================================
+
+# Google Drive Model URL - Replace with your shared link
+# Format: https://drive.google.com/file/d/FILE_ID/view?usp=sharing
+# Extract FILE_ID and use: https://drive.google.com/uc?id=FILE_ID
+GDRIVE_MODEL_URL = "https://drive.google.com/uc?id=1BgYItrZL2TYAbJAQiKDV_LlNMIoKxBfI"  # Set this to your Google Drive direct download URL
+
+def download_model_from_gdrive(url, output_path):
+    """Download model from Google Drive"""
+    try:
+        import gdown
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        gdown.download(url, output_path, quiet=False)
+        return True
+    except Exception as e:
+        st.error(f"Failed to download model: {e}")
+        return False
+
 @st.cache_resource
 def load_model():
-    """Load the trained model (cached)"""
+    """Load the trained model (cached) - supports local and Google Drive"""
     model_paths = [
         "artifacts/models/transfer_model_stage1_best.keras",
         "artifacts/models/transfer_model_final.keras",
@@ -160,10 +177,19 @@ def load_model():
     
     custom_objects = {'f2_score': f2_score}
     
+    # Try local paths first
     for path in model_paths:
         if os.path.exists(path):
             model = tf.keras.models.load_model(path, custom_objects=custom_objects)
             return model, path
+    
+    # If no local model, try Google Drive download
+    if GDRIVE_MODEL_URL:
+        download_path = "artifacts/models/transfer_model_stage1_best.keras"
+        st.info("Downloading model from Google Drive... (first time only)")
+        if download_model_from_gdrive(GDRIVE_MODEL_URL, download_path):
+            model = tf.keras.models.load_model(download_path, custom_objects=custom_objects)
+            return model, download_path
     
     return None, None
 

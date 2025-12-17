@@ -18,3 +18,4 @@ albumentations>=1.0.0
 # --- Utilities ---
 tqdm
 kaggle
+gdown
