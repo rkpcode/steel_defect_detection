@@ -19,3 +19,4 @@ albumentations>=1.0.0
 tqdm
 kaggle
 gdown
+streamlit>=1.28.0
