@@ -1,0 +1,11 @@
+Full Dataset Evaluation Results
+================================
+Total Patches: 14674
+Defective: 6055
+Optimal Threshold: 0.30000000000000004
+Recall: 0.9997
+Precision: 0.4126
+TP: 6053
+FN: 2
+FP: 8618
+TN: 1
