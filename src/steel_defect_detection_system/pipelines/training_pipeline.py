@@ -16,7 +16,6 @@ from src.steel_defect_detection_system.logger import logger
 from src.steel_defect_detection_system.exception import CustomException
 from src.steel_defect_detection_system.components.data_ingestion import DataIngestion, DataIngestionConfig
 from src.steel_defect_detection_system.components.data_transformation import DataTransformation, DataTransformationConfig
-from src.steel_defect_detection_system.components.data_transformation_optimized import OptimizedDataTransformation
 from src.steel_defect_detection_system.components.model_trainer import ModelTrainer, ModelTrainerConfig
 from src.steel_defect_detection_system.components.model_evaluation import ModelEvaluation, ModelEvaluationConfig
 class TrainingPipeline:
@@ -63,13 +62,11 @@ class TrainingPipeline:
     
     def run_step_2_data_transformation(self, train_path: str, test_path: str,
                                         max_train_images: int = None,
-                                        max_test_images: int = None,
-                                        memory_efficient: bool = False,
-                                        optimized: bool = True):
+                                        max_test_images: int = None):
         """
         STEP 2: Data Transformation
         
-        - Extract patches from images (256x256, 50% overlap)
+        - Extract patches ON-THE-FLY (no disk storage)
         - Generate patch-level labels from masks
         - Apply safe augmentations
         - Create TensorFlow datasets with class balancing
@@ -79,51 +76,23 @@ class TrainingPipeline:
             test_path: Path to test CSV
             max_train_images: Limit training images (for testing)
             max_test_images: Limit test images (for testing)
-            memory_efficient: Use disk-based approach for large datasets
-            optimized: Use on-the-fly patch extraction (RECOMMENDED!)
         """
         logger.info("=" * 60)
-        logger.info("STEP 2: DATA TRANSFORMATION")
+        logger.info("STEP 2: DATA TRANSFORMATION (Optimized)")
         logger.info("=" * 60)
         
         try:
-            if optimized:
-                # RECOMMENDED: On-the-fly patch extraction
-                logger.info("Using OPTIMIZED mode (on-the-fly patches, no disk storage)")
-                transformer = OptimizedDataTransformation(self.transformation_config)
-                result = transformer.initiate_data_transformation(
-                    train_path=train_path,
-                    test_path=test_path,
-                    max_train_images=max_train_images,
-                    max_test_images=max_test_images
-                )
-                logger.info(f"\n[OK] Step 2 Complete!")
-                logger.info(f"   Train patches (estimated): {result['train_patches']}")
-                logger.info(f"   Test patches (estimated): {result['test_patches']}")
-            elif memory_efficient:
-                logger.info("Using MEMORY-EFFICIENT mode (disk-based)")
-                transformer = DataTransformation(self.transformation_config)
-                result = transformer.initiate_data_transformation_memory_efficient(
-                    train_path=train_path,
-                    test_path=test_path,
-                    max_train_images=max_train_images,
-                    max_test_images=max_test_images
-                )
-                logger.info(f"\n[OK] Step 2 Complete!")
-                logger.info(f"   Train patches: {len(result['y_train'])}")
-                logger.info(f"   Test patches: {len(result['X_test'])}")
-            else:
-                transformer = DataTransformation(self.transformation_config)
-                result = transformer.initiate_data_transformation(
-                    train_path=train_path,
-                    test_path=test_path,
-                    max_train_images=max_train_images,
-                    max_test_images=max_test_images
-                )
-                logger.info(f"\n[OK] Step 2 Complete!")
-                logger.info(f"   Train patches: {len(result['X_train'])}")
-                logger.info(f"   Test patches: {len(result['X_test'])}")
+            transformer = DataTransformation(self.transformation_config)
+            result = transformer.initiate_data_transformation(
+                train_path=train_path,
+                test_path=test_path,
+                max_train_images=max_train_images,
+                max_test_images=max_test_images
+            )
             
+            logger.info(f"\n[OK] Step 2 Complete!")
+            logger.info(f"   Train patches: {result['train_patches']}")
+            logger.info(f"   Test patches: {result['test_patches']}")
             logger.info(f"   Class weights: {result['class_weights']}")
             
             return result
