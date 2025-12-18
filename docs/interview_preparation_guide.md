@@ -244,7 +244,7 @@
 ## Project Links
 
 - **GitHub:** https://github.com/rkpcode/steel_defect_detection
-- **Live Demo:** https://steel-defect-detector.streamlit.app/
+- **Live Demo:** https://steel-qc-ai.streamlit.app/
 - **Dataset:** [Severstal Steel Defect Detection](https://www.kaggle.com/c/severstal-steel-defect-detection)
 
 ---
