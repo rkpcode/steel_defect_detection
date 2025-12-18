@@ -232,16 +232,13 @@ def predict_image(model, image: np.ndarray, threshold: float = 0.3):
     mean_prob = float(np.mean(predictions))
     n_defective = int(np.sum(predictions >= threshold))
     
-    # Decision
-    if max_prob < 0.2:
+    # Decision based on threshold
+    if max_prob < threshold:
         decision = "PASS"
         decision_class = "result-pass"
-    elif max_prob > 0.4:
+    else:
         decision = "FAIL"
         decision_class = "result-fail"
-    else:
-        decision = "HOLD"
-        decision_class = "result-hold"
     
     return {
         'decision': decision,
@@ -273,22 +270,23 @@ def main():
         
         threshold = st.slider(
             "Detection Threshold",
-            min_value=0.1,
+            min_value=0.3,
             max_value=0.9,
-            value=0.3,
+            value=0.60,
             step=0.05,
-            help="Lower = more sensitive (catches more defects)"
+            help="Safety Operating Point: 0.60 (94% Recall, 62% Precision). Lower = more sensitive"
         )
         
         st.markdown("---")
         
         st.markdown("### 📊 Decision Logic")
-        st.markdown("""
+        st.markdown(f"""
         | Confidence | Decision |
         |------------|----------|
-        | < 0.2 | ✅ **PASS** |
-        | 0.2 - 0.4 | ⚠️ **HOLD** |
-        | > 0.4 | ❌ **FAIL** |
+        | < {threshold:.2f} | ✅ **PASS** |
+        | ≥ {threshold:.2f} | ❌ **FAIL** |
+        
+        *Threshold: {threshold:.2f} (94% Recall)*
         """)
         
         st.markdown("---")
