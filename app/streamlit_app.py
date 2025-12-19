@@ -212,7 +212,7 @@ def extract_patches(image: np.ndarray, patch_size: int = 256, stride: int = 128)
     return patches, coords
 
 
-def predict_image(model, image: np.ndarray, threshold: float = 0.37):
+def predict_image(model, image: np.ndarray, threshold: float = 0.50):
     """Run prediction on image"""
     # Normalize
     img_normalized = image.astype(np.float32) / 255.0
@@ -270,11 +270,11 @@ def main():
         
         threshold = st.slider(
             "Detection Threshold",
-            min_value=0.20,
+            min_value=0.30,
             max_value=0.70,
-            value=0.37,
+            value=0.50,
             step=0.01,
-            help="Optimal Threshold: 0.37 (99.55% Recall, 47.36% Precision, F2=0.816). Lower = more sensitive"
+            help="Production Threshold: 0.50 (97.5% Recall, 56% Precision, F2=0.75). Balanced for operational efficiency."
         )
         
         st.markdown("---")
@@ -286,7 +286,7 @@ def main():
         | < {threshold:.2f} | ✅ **PASS** |
         | ≥ {threshold:.2f} | ❌ **FAIL** |
         
-        *Optimal: 0.37 (99.55% Recall, F2=0.816)*
+        *Production: 0.50 (97.5% Recall, 56% Precision)*
         """)
         
         st.markdown("---")
@@ -398,7 +398,7 @@ def main():
     st.markdown("""
     <div style="text-align: center; color: rgba(255,255,255,0.5); padding: 1rem;">
         <p>Steel Defect Detection System | Built with ❤️ using Deep Learning</p>
-        <p>EfficientNetB0 Transfer Learning | 99.55% Recall | Threshold: 0.37</p>
+        <p>EfficientNetB0 Transfer Learning | 97.5% Recall | Production Threshold: 0.50</p>
     </div>
     """, unsafe_allow_html=True)
 
