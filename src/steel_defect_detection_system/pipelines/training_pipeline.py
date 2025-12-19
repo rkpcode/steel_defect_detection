@@ -128,6 +128,17 @@ class TrainingPipeline:
             test_dataset = transformation_result['test_dataset']
             class_weights = transformation_result['class_weights']
             
+            # Calculate steps per epoch (required for repeat() datasets)
+            batch_size = self.transformation_config.batch_size
+            train_patches = transformation_result['train_patches']
+            test_patches = transformation_result['test_patches']
+            
+            steps_per_epoch = train_patches // batch_size
+            validation_steps = test_patches // batch_size
+            
+            logger.info(f"Steps per epoch: {steps_per_epoch} (train_patches={train_patches}, batch={batch_size})")
+            logger.info(f"Validation steps: {validation_steps} (test_patches={test_patches}, batch={batch_size})")
+            
             # Configure trainer
             trainer_config = ModelTrainerConfig()
             trainer_config.epochs = epochs
@@ -140,7 +151,9 @@ class TrainingPipeline:
                 val_dataset=test_dataset,
                 class_weights=class_weights,
                 model_type=model_type,
-                fine_tune=fine_tune
+                fine_tune=fine_tune,
+                steps_per_epoch=steps_per_epoch,
+                validation_steps=validation_steps
             )
             
             logger.info(f"\n[OK] Step 3 Complete!")

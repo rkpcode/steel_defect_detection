@@ -297,7 +297,9 @@ class ModelTrainer:
     def train(self, train_dataset: tf.data.Dataset, 
               val_dataset: tf.data.Dataset,
               class_weights: Dict[int, float] = None,
-              model_name: str = "model") -> dict:
+              model_name: str = "model",
+              steps_per_epoch: int = None,
+              validation_steps: int = None) -> dict:
         """
         Train the model.
         
@@ -306,6 +308,8 @@ class ModelTrainer:
             val_dataset: Validation TF dataset
             class_weights: Class weights for imbalance
             model_name: Name for saving
+            steps_per_epoch: Number of steps per epoch (required if dataset uses repeat())
+            validation_steps: Number of validation steps (required if dataset uses repeat())
         
         Returns:
             Training history
@@ -321,6 +325,12 @@ class ModelTrainer:
             # Get callbacks
             callbacks_list = self.get_callbacks(model_name)
             
+            # Log training info
+            if steps_per_epoch:
+                logger.info(f"Steps per epoch: {steps_per_epoch}")
+            if validation_steps:
+                logger.info(f"Validation steps: {validation_steps}")
+            
             # Train
             self.history = self.model.fit(
                 train_dataset,
@@ -328,6 +338,8 @@ class ModelTrainer:
                 epochs=self.config.epochs,
                 class_weight=class_weights,
                 callbacks=callbacks_list,
+                steps_per_epoch=steps_per_epoch,
+                validation_steps=validation_steps,
                 verbose=1
             )
             
@@ -404,7 +416,9 @@ class ModelTrainer:
                                  val_dataset: tf.data.Dataset,
                                  class_weights: Dict[int, float] = None,
                                  model_type: str = "transfer",
-                                 fine_tune: bool = True) -> Dict:
+                                 fine_tune: bool = True,
+                                 steps_per_epoch: int = None,
+                                 validation_steps: int = None) -> Dict:
         """
         Main method to run model training.
         
@@ -414,6 +428,8 @@ class ModelTrainer:
             class_weights: For imbalance handling
             model_type: "baseline" or "transfer"
             fine_tune: Whether to do fine-tuning (transfer only)
+            steps_per_epoch: Number of training steps per epoch
+            validation_steps: Number of validation steps per epoch
         """
         try:
             logger.info("=" * 60)
@@ -437,7 +453,9 @@ class ModelTrainer:
                 history = self.train(
                     train_dataset, val_dataset,
                     class_weights=class_weights,
-                    model_name=f"{model_type}_model"
+                    model_name=f"{model_type}_model",
+                    steps_per_epoch=steps_per_epoch,
+                    validation_steps=validation_steps
                 )
             
             logger.info("=" * 60)
