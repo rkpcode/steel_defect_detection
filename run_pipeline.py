@@ -64,12 +64,9 @@ if __name__ == "__main__":
     print("[OK] PIPELINE COMPLETE")
     print("="*60)
     
-    # Handle memory-efficient mode where X_train is None
-    if result['transformation_result'].get('memory_efficient'):
-        print(f"Train patches: {len(result['transformation_result']['y_train'])}")
-    else:
-        print(f"Train patches: {len(result['transformation_result']['X_train'])}")
-    print(f"Test patches: {len(result['transformation_result']['X_test'])}")
+    # Print dataset statistics
+    print(f"Train patches: {result['transformation_result']['train_patches']}")
+    print(f"Test patches: {result['transformation_result']['test_patches']}")
     
     if result['training_result']:
         history = result['training_result']['history']
