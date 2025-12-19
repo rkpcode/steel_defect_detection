@@ -68,10 +68,26 @@ if __name__ == "__main__":
     logger.info("Steel Defect Detection System")
     logger.info("=" * 60)
     
-    # Load trained model
+    # Define custom F2 score metric (same as in model_trainer.py)
+    def f2_score(y_true, y_pred):
+        """Custom F2 score metric for model loading."""
+        y_true = tf.cast(y_true, tf.float32)
+        y_pred_binary = tf.cast(y_pred > 0.5, tf.float32)
+        
+        tp = tf.reduce_sum(y_true * y_pred_binary)
+        fp = tf.reduce_sum((1 - y_true) * y_pred_binary)
+        fn = tf.reduce_sum(y_true * (1 - y_pred_binary))
+        
+        precision = tp / (tp + fp + tf.keras.backend.epsilon())
+        recall = tp / (tp + fn + tf.keras.backend.epsilon())
+        
+        f2 = 5 * precision * recall / (4 * precision + recall + tf.keras.backend.epsilon())
+        return f2
+    
+    # Load trained model with custom objects
     model_path = "artifacts/models/transfer_model_best.keras"
     logger.info(f"\nLoading model: {model_path}")
-    model = tf.keras.models.load_model(model_path)
+    model = tf.keras.models.load_model(model_path, custom_objects={'f2_score': f2_score})
     logger.info("✅ Model loaded successfully")
     
     # Load test dataset
