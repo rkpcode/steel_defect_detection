@@ -56,47 +56,57 @@ def denormalize(image):
 # ============================================
 print("\nLoading model...")
 model = tf.keras.models.load_model(
-    'artifacts/models/transfer_model_stage1_best.keras',
+    'artifacts/models/transfer_model_best.keras',
     custom_objects={'f2_score': f2_score}
 )
 
-# Load test metadata
+# Load test data using pipeline
 print("Loading test data...")
-test_meta_path = 'artifacts/data/patches/test/test_metadata.csv'
+from steel_defect_detection_system.pipelines.training_pipeline import TrainingPipeline
 
-if os.path.exists(test_meta_path):
-    test_meta = pd.read_csv(test_meta_path)
-    y_test = test_meta['label'].values
-    
-    print(f"\nTest samples: {len(y_test)}")
-    print(f"Defective: {sum(y_test)} ({sum(y_test)/len(y_test)*100:.1f}%)")
-    print(f"Clean: {len(y_test) - sum(y_test)} ({(len(y_test)-sum(y_test))/len(y_test)*100:.1f}%)")
-    
-    # ============================================
-    # 2. Generate Predictions (batch-wise)
-    # ============================================
-    print("\nGenerating predictions...")
-    y_pred_proba = []
-    batch_size = 200
-    
-    for i in range(0, len(test_meta), batch_size):
-        batch_paths = test_meta['file_path'].values[i:i+batch_size]
-        X_batch = np.array([preprocess(np.load(p)) for p in batch_paths])
-        preds = model.predict(X_batch, verbose=0).flatten()
-        y_pred_proba.extend(preds)
-        del X_batch
-        gc.collect()
-        if i % 2000 == 0:
-            print(f"Progress: {i}/{len(test_meta)}")
-    
-    y_pred_proba = np.array(y_pred_proba)
-    
-else:
-    print("ERROR: Patches not found. Run pipeline first!")
-    exit(1)
+pipeline = TrainingPipeline()
+result = pipeline.run_step_2_data_transformation(
+    train_path='artifacts/data/processed/train.csv',
+    test_path='artifacts/data/processed/test.csv',
+    max_train_images=5,
+    max_test_images=None
+)
 
-# Use optimal threshold
-THRESHOLD = 0.3
+test_dataset = result['test_dataset']
+validation_steps = result['test_patches'] // 32  # batch_size = 32
+
+print(f"\nTest patches: {result['test_patches']}")
+
+# ============================================
+# 2. Generate Predictions (from dataset)
+# ============================================
+print("\nGenerating predictions...")
+y_test_list = []
+y_pred_proba_list = []
+images_list = []  # Store images for visualization
+
+for i, (images, labels) in enumerate(test_dataset):
+    if i >= validation_steps:
+        break
+    predictions = model.predict(images, verbose=0)
+    y_test_list.append(labels.numpy())
+    y_pred_proba_list.append(predictions.flatten())
+    # Store first 1000 images for visualization
+    if i < 32:  # ~1000 images
+        images_list.append(images.numpy())
+    if i % 50 == 0:
+        print(f"Progress: {i}/{validation_steps}")
+
+y_test = np.concatenate(y_test_list)
+y_pred_proba = np.concatenate(y_pred_proba_list)
+images_array = np.concatenate(images_list) if images_list else None
+
+print(f"Extracted {len(y_test)} samples")
+print(f"Defective: {sum(y_test)} ({sum(y_test)/len(y_test)*100:.1f}%)")
+print(f"Clean: {len(y_test) - sum(y_test)} ({(len(y_test)-sum(y_test))/len(y_test)*100:.1f}%)")
+
+# Use production threshold
+THRESHOLD = 0.50
 y_pred = (y_pred_proba >= THRESHOLD).astype(int)
 
 # ============================================
@@ -136,28 +146,31 @@ print("=" * 60)
 # Create output directory
 os.makedirs('artifacts/evaluation/error_analysis', exist_ok=True)
 
-if len(fn_indices) > 0:
-    n_samples = min(10, len(fn_indices))
-    fig, axes = plt.subplots(2, 5, figsize=(20, 8))
-    fig.suptitle(f'False Negatives (Missed Defects) - Threshold {THRESHOLD}', fontsize=14)
+if len(fn_indices) > 0 and images_array is not None:
+    # Find FN indices within stored images
+    fn_in_stored = [idx for idx in fn_indices if idx < len(images_array)]
+    n_samples = min(10, len(fn_in_stored))
     
-    for i, idx in enumerate(fn_indices[:n_samples]):
-        ax = axes[i // 5, i % 5]
-        # Load and denormalize for display
-        img_raw = np.load(test_meta['file_path'].values[idx])
-        img = (img_raw - img_raw.min()) / (img_raw.max() - img_raw.min() + 1e-8)
-        ax.imshow(img)
-        ax.set_title(f'Prob: {y_pred_proba[idx]:.3f}\nActual: Defect')
-        ax.axis('off')
-    
-    # Hide empty subplots
-    for i in range(n_samples, 10):
-        axes[i // 5, i % 5].axis('off')
-    
-    plt.tight_layout()
-    plt.savefig('artifacts/evaluation/error_analysis/false_negatives.png', dpi=150)
-    plt.close()
-    print(f"Saved: artifacts/evaluation/error_analysis/false_negatives.png")
+    if n_samples > 0:
+        fig, axes = plt.subplots(2, 5, figsize=(20, 8))
+        fig.suptitle(f'False Negatives (Missed Defects) - Threshold {THRESHOLD}', fontsize=14)
+        
+        for i, idx in enumerate(fn_in_stored[:n_samples]):
+            ax = axes[i // 5, i % 5]
+            # Denormalize image for display
+            img = denormalize(images_array[idx])
+            ax.imshow(img)
+            ax.set_title(f'Prob: {y_pred_proba[idx]:.3f}\nActual: Defect')
+            ax.axis('off')
+        
+        # Hide empty subplots
+        for i in range(n_samples, 10):
+            axes[i // 5, i % 5].axis('off')
+        
+        plt.tight_layout()
+        plt.savefig('artifacts/evaluation/error_analysis/false_negatives.png', dpi=150)
+        plt.close()
+        print(f"Saved: artifacts/evaluation/error_analysis/false_negatives.png")
     
     # Analyze FN probability distribution
     fn_probs = y_pred_proba[fn_indices]
@@ -167,7 +180,7 @@ if len(fn_indices) > 0:
     print(f"  Min: {fn_probs.min():.3f}")
     print(f"  Std: {fn_probs.std():.3f}")
 else:
-    print("No false negatives! Perfect recall.")
+    print("No false negatives or images not available for visualization.")
 
 # ============================================
 # 5. Visualize False Positives
@@ -176,28 +189,31 @@ print("\n" + "=" * 60)
 print("FALSE POSITIVE ANALYSIS (False Alarms)")
 print("=" * 60)
 
-if len(fp_indices) > 0:
-    n_samples = min(10, len(fp_indices))
-    fig, axes = plt.subplots(2, 5, figsize=(20, 8))
-    fig.suptitle(f'False Positives (Incorrectly Flagged) - Threshold {THRESHOLD}', fontsize=14)
+if len(fp_indices) > 0 and images_array is not None:
+    # Find FP indices within stored images
+    fp_in_stored = [idx for idx in fp_indices if idx < len(images_array)]
+    n_samples = min(10, len(fp_in_stored))
     
-    for i, idx in enumerate(fp_indices[:n_samples]):
-        ax = axes[i // 5, i % 5]
-        # Load and normalize for display
-        img_raw = np.load(test_meta['file_path'].values[idx])
-        img = (img_raw - img_raw.min()) / (img_raw.max() - img_raw.min() + 1e-8)
-        ax.imshow(img)
-        ax.set_title(f'Prob: {y_pred_proba[idx]:.3f}\nActual: Clean')
-        ax.axis('off')
-    
-    # Hide empty subplots
-    for i in range(n_samples, 10):
-        axes[i // 5, i % 5].axis('off')
-    
-    plt.tight_layout()
-    plt.savefig('artifacts/evaluation/error_analysis/false_positives.png', dpi=150)
-    plt.close()
-    print(f"Saved: artifacts/evaluation/error_analysis/false_positives.png")
+    if n_samples > 0:
+        fig, axes = plt.subplots(2, 5, figsize=(20, 8))
+        fig.suptitle(f'False Positives (Incorrectly Flagged) - Threshold {THRESHOLD}', fontsize=14)
+        
+        for i, idx in enumerate(fp_in_stored[:n_samples]):
+            ax = axes[i // 5, i % 5]
+            # Denormalize image for display
+            img = denormalize(images_array[idx])
+            ax.imshow(img)
+            ax.set_title(f'Prob: {y_pred_proba[idx]:.3f}\nActual: Clean')
+            ax.axis('off')
+        
+        # Hide empty subplots
+        for i in range(n_samples, 10):
+            axes[i // 5, i % 5].axis('off')
+        
+        plt.tight_layout()
+        plt.savefig('artifacts/evaluation/error_analysis/false_positives.png', dpi=150)
+        plt.close()
+        print(f"Saved: artifacts/evaluation/error_analysis/false_positives.png")
     
     # Analyze FP probability distribution
     fp_probs = y_pred_proba[fp_indices]
@@ -207,7 +223,7 @@ if len(fp_indices) > 0:
     print(f"  Min: {fp_probs.min():.3f}")
     print(f"  Std: {fp_probs.std():.3f}")
 else:
-    print("No false positives!")
+    print("No false positives or images not available for visualization.")
 
 # ============================================
 # 6. Error Distribution Analysis
