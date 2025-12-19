@@ -169,7 +169,7 @@ def download_model_from_gdrive(url, output_path):
 def load_model():
     """Load the trained model (cached) - supports local and Google Drive"""
     model_paths = [
-        "artifacts/models/transfer_model_stage1_best.keras",
+        "artifacts/models/transfer_model_best.keras",  # New transfer learning model (99.55% recall)
         "artifacts/models/transfer_model_final.keras",
         "artifacts/models/baseline_model_final.keras",
         "artifacts/models/baseline_model_best.keras"
@@ -185,7 +185,7 @@ def load_model():
     
     # If no local model, try Google Drive download
     if GDRIVE_MODEL_URL:
-        download_path = "artifacts/models/transfer_model_stage1_best.keras"
+        download_path = "artifacts/models/transfer_model_best.keras"
         st.info("Downloading model from Google Drive... (first time only)")
         if download_model_from_gdrive(GDRIVE_MODEL_URL, download_path):
             model = tf.keras.models.load_model(download_path, custom_objects=custom_objects)
@@ -212,7 +212,7 @@ def extract_patches(image: np.ndarray, patch_size: int = 256, stride: int = 128)
     return patches, coords
 
 
-def predict_image(model, image: np.ndarray, threshold: float = 0.3):
+def predict_image(model, image: np.ndarray, threshold: float = 0.37):
     """Run prediction on image"""
     # Normalize
     img_normalized = image.astype(np.float32) / 255.0
@@ -270,11 +270,11 @@ def main():
         
         threshold = st.slider(
             "Detection Threshold",
-            min_value=0.3,
-            max_value=0.9,
-            value=0.60,
-            step=0.05,
-            help="Safety Operating Point: 0.60 (94% Recall, 62% Precision). Lower = more sensitive"
+            min_value=0.20,
+            max_value=0.70,
+            value=0.37,
+            step=0.01,
+            help="Optimal Threshold: 0.37 (99.55% Recall, 47.36% Precision, F2=0.816). Lower = more sensitive"
         )
         
         st.markdown("---")
@@ -286,7 +286,7 @@ def main():
         | < {threshold:.2f} | ✅ **PASS** |
         | ≥ {threshold:.2f} | ❌ **FAIL** |
         
-        *Threshold: {threshold:.2f} (94% Recall)*
+        *Optimal: 0.37 (99.55% Recall, F2=0.816)*
         """)
         
         st.markdown("---")
@@ -398,7 +398,7 @@ def main():
     st.markdown("""
     <div style="text-align: center; color: rgba(255,255,255,0.5); padding: 1rem;">
         <p>Steel Defect Detection System | Built with ❤️ using Deep Learning</p>
-        <p>EfficientNetB0 Transfer Learning | Recall-First Design</p>
+        <p>EfficientNetB0 Transfer Learning | 99.55% Recall | Threshold: 0.37</p>
     </div>
     """, unsafe_allow_html=True)
 
