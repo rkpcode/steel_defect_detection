@@ -28,7 +28,7 @@ from tensorflow.keras.applications import ResNet50, EfficientNetB0
 
 from src.steel_defect_detection_system.exception import CustomException
 from src.steel_defect_detection_system.logger import logger
-from src.steel_defect_detection_system.utils.mlflow_utils import get_tracker, log_training_metrics
+from src.steel_defect_detection_system.utils import get_tracker, log_training_metrics
 
 @dataclass
 class ModelTrainerConfig:

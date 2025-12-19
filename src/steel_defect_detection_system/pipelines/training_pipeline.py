@@ -18,7 +18,7 @@ from src.steel_defect_detection_system.components.data_ingestion import DataInge
 from src.steel_defect_detection_system.components.data_transformation import DataTransformation, DataTransformationConfig
 from src.steel_defect_detection_system.components.model_trainer import ModelTrainer, ModelTrainerConfig
 from src.steel_defect_detection_system.components.model_evaluation import ModelEvaluation, ModelEvaluationConfig
-from src.steel_defect_detection_system.utils.mlflow_utils import get_tracker
+from src.steel_defect_detection_system.utils import get_tracker
 class TrainingPipeline:
     """
     End-to-end training pipeline for Steel Defect Detection.
