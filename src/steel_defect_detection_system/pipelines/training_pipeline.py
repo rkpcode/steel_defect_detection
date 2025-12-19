@@ -18,6 +18,7 @@ from src.steel_defect_detection_system.components.data_ingestion import DataInge
 from src.steel_defect_detection_system.components.data_transformation import DataTransformation, DataTransformationConfig
 from src.steel_defect_detection_system.components.model_trainer import ModelTrainer, ModelTrainerConfig
 from src.steel_defect_detection_system.components.model_evaluation import ModelEvaluation, ModelEvaluationConfig
+from src.steel_defect_detection_system.utils.mlflow_utils import get_tracker
 class TrainingPipeline:
     """
     End-to-end training pipeline for Steel Defect Detection.
@@ -32,6 +33,7 @@ class TrainingPipeline:
     def __init__(self):
         self.ingestion_config = DataIngestionConfig()
         self.transformation_config = DataTransformationConfig()
+        self.mlflow_tracker = get_tracker()
         logger.info("Training Pipeline initialized")
     
     def run_step_1_data_ingestion(self):
@@ -227,6 +229,23 @@ class TrainingPipeline:
         logger.info("Steel Defect Detection System")
         logger.info("=" * 60)
         
+        # Start MLflow run
+        run_name = f"{model_type}_model_e{epochs}"
+        self.mlflow_tracker.start_run(
+            run_name=run_name,
+            tags={"model_type": model_type, "phase": "training"}
+        )
+        
+        # Log pipeline parameters
+        self.mlflow_tracker.log_params({
+            "model_type": model_type,
+            "epochs": epochs,
+            "batch_size": self.transformation_config.batch_size,
+            "learning_rate": ModelTrainerConfig().learning_rate,
+            "max_train_images": max_train_images or "all",
+            "max_test_images": max_test_images or "all"
+        })
+        
         # Step 1: Data Ingestion
         train_path, test_path, ingestion_stats = self.run_step_1_data_ingestion()
         
@@ -258,6 +277,9 @@ class TrainingPipeline:
         logger.info("=" * 60)
         logger.info("PIPELINE COMPLETE")
         logger.info("=" * 60)
+        
+        # End MLflow run
+        self.mlflow_tracker.end_run()
         
         return {
             'ingestion_stats': ingestion_stats,

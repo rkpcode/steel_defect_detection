@@ -28,6 +28,7 @@ from tensorflow.keras.applications import ResNet50, EfficientNetB0
 
 from src.steel_defect_detection_system.exception import CustomException
 from src.steel_defect_detection_system.logger import logger
+from src.steel_defect_detection_system.utils.mlflow_utils import get_tracker, log_training_metrics
 
 @dataclass
 class ModelTrainerConfig:
@@ -50,6 +51,15 @@ class ModelTrainerConfig:
     backbone: str = "efficientnet"  # "resnet50" or "efficientnet"
     freeze_backbone: bool = True
     fine_tune_at: int = 100  # Unfreeze layers after this index
+
+
+class MLflowCallback(keras.callbacks.Callback):
+    """Custom callback to log metrics to MLflow after each epoch."""
+    
+    def on_epoch_end(self, epoch, logs=None):
+        """Log metrics to MLflow at the end of each epoch."""
+        if logs:
+            log_training_metrics(logs, epoch + 1)
 
 
 class BaselineCNN:
@@ -289,7 +299,10 @@ class ModelTrainer:
             callbacks.TensorBoard(
                 log_dir=os.path.join(self.config.logs_dir, model_name),
                 histogram_freq=1
-            )
+            ),
+            
+            # MLflow logging
+            MLflowCallback()
         ]
         
         return callbacks_list
