@@ -37,7 +37,7 @@ print("="*60)
 # Load model
 print("\nLoading model...")
 model = tf.keras.models.load_model(
-    'artifacts/models/transfer_model_stage1_best.keras', 
+    'artifacts/models/transfer_model_best.keras', 
     custom_objects={'f2_score': f2_score}
 )
 
@@ -79,18 +79,29 @@ else:
         max_train_images=5,
         max_test_images=None
     )
-    X_test = result['X_test']
-    y_test = result['y_test']
     
-    print(f"\nTest patches: {len(y_test)}")
-    print(f"Defective: {sum(y_test)} ({sum(y_test)/len(y_test)*100:.1f}%)")
+    test_dataset = result['test_dataset']
+    validation_steps = result['test_patches'] // 32  # batch_size = 32
     
-    # Apply preprocessing to already loaded patches
-    print("\nApplying preprocessing...")
-    X_test_preprocessed = np.array([preprocess(x) for x in X_test])
+    print(f"\nTest patches: {result['test_patches']}")
     
+    # Extract predictions from dataset
     print("\nGenerating predictions...")
-    y_pred_proba = model.predict(X_test_preprocessed, verbose=1).flatten()
+    y_test_list = []
+    y_pred_proba_list = []
+    
+    for i, (images, labels) in enumerate(test_dataset):
+        if i >= validation_steps:
+            break
+        predictions = model.predict(images, verbose=0)
+        y_test_list.append(labels.numpy())
+        y_pred_proba_list.append(predictions.flatten())
+    
+    y_test = np.concatenate(y_test_list)
+    y_pred_proba = np.concatenate(y_pred_proba_list)
+    
+    print(f"Extracted {len(y_test)} samples")
+    print(f"Defective: {sum(y_test)} ({sum(y_test)/len(y_test)*100:.1f}%)")
 
 # Find optimal threshold
 print("\n" + "="*60)
