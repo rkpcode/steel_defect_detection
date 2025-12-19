@@ -212,8 +212,8 @@ def extract_patches(image: np.ndarray, patch_size: int = 256, stride: int = 128)
     return patches, coords
 
 
-def predict_image(model, image: np.ndarray, threshold: float = 0.50):
-    """Run prediction on image"""
+def predict_image(model, image: np.ndarray, pass_threshold: float = 0.40, reject_threshold: float = 0.65):
+    """Run prediction on image with traffic light logic"""
     # Normalize
     img_normalized = image.astype(np.float32) / 255.0
     
@@ -230,25 +230,40 @@ def predict_image(model, image: np.ndarray, threshold: float = 0.50):
     # Aggregate
     max_prob = float(np.max(predictions))
     mean_prob = float(np.mean(predictions))
-    n_defective = int(np.sum(predictions >= threshold))
     
-    # Decision based on threshold
-    if max_prob < threshold:
+    # Traffic Light Decision Logic
+    if max_prob > reject_threshold:
+        decision = "REJECT"
+        decision_class = "result-fail"
+        confidence_level = "High"
+    elif max_prob < pass_threshold:
         decision = "PASS"
         decision_class = "result-pass"
+        confidence_level = "High"
     else:
-        decision = "FAIL"
-        decision_class = "result-fail"
+        decision = "REVIEW"
+        decision_class = "result-hold"
+        confidence_level = "Uncertain"
+    
+    # Count patches in each zone
+    n_auto_pass = int(np.sum(predictions < pass_threshold))
+    n_manual_review = int(np.sum((predictions >= pass_threshold) & (predictions <= reject_threshold)))
+    n_auto_reject = int(np.sum(predictions > reject_threshold))
     
     return {
         'decision': decision,
         'decision_class': decision_class,
         'confidence': max_prob,
+        'confidence_level': confidence_level,
         'mean_prob': mean_prob,
-        'n_defective': n_defective,
+        'n_auto_pass': n_auto_pass,
+        'n_manual_review': n_manual_review,
+        'n_auto_reject': n_auto_reject,
         'total_patches': len(patches),
         'patch_probs': predictions,
-        'coords': coords
+        'coords': coords,
+        'pass_threshold': pass_threshold,
+        'reject_threshold': reject_threshold
     }
 
 
@@ -268,25 +283,37 @@ def main():
     with st.sidebar:
         st.markdown("### ⚙️ Settings")
         
-        threshold = st.slider(
-            "Detection Threshold",
-            min_value=0.30,
-            max_value=0.70,
-            value=0.50,
+        st.markdown("#### Traffic Light Thresholds")
+        
+        pass_threshold = st.slider(
+            "🟢 Auto-Pass Threshold",
+            min_value=0.20,
+            max_value=0.50,
+            value=0.40,
             step=0.01,
-            help="Production Threshold: 0.50 (97.5% Recall, 56% Precision, F2=0.75). Balanced for operational efficiency."
+            help="Below this: Auto-PASS (Clean steel, no review needed)"
+        )
+        
+        reject_threshold = st.slider(
+            "🔴 Auto-Reject Threshold",
+            min_value=0.50,
+            max_value=0.80,
+            value=0.65,
+            step=0.01,
+            help="Above this: Auto-REJECT (Confirmed defect)"
         )
         
         st.markdown("---")
         
         st.markdown("### 📊 Decision Logic")
         st.markdown(f"""
-        | Confidence | Decision |
-        |------------|----------|
-        | < {threshold:.2f} | ✅ **PASS** |
-        | ≥ {threshold:.2f} | ❌ **FAIL** |
+        | Confidence | Decision | Action |
+        |------------|----------|--------|
+        | < {pass_threshold:.2f} | 🟢 **PASS** | Auto-approve |
+        | {pass_threshold:.2f} - {reject_threshold:.2f} | ⚠️ **REVIEW** | Manual inspection |
+        | > {reject_threshold:.2f} | 🔴 **REJECT** | Auto-reject |
         
-        *Production: 0.50 (97.5% Recall, 56% Precision)*
+        *Data-driven thresholds based on probability distribution*
         """)
         
         st.markdown("---")
@@ -352,38 +379,63 @@ def main():
                 if len(image_to_process.shape) == 2:
                     image_to_process = np.stack([image_to_process] * 3, axis=-1)
                 
-                result = predict_image(model, image_to_process, threshold)
+                result = predict_image(model, image_to_process, pass_threshold, reject_threshold)
             
             if result:
-                # Decision card
-                decision_emoji = {"PASS": "✅", "FAIL": "❌", "HOLD": "⚠️"}
+                # Decision card with traffic light logic
+                decision_emoji = {"PASS": "✅", "REJECT": "❌", "REVIEW": "⚠️"}
+                decision_color = {"PASS": "green", "REJECT": "red", "REVIEW": "orange"}
+                
                 st.markdown(f"""
                 <div class="result-card {result['decision_class']}">
                     <h1>{decision_emoji[result['decision']]} {result['decision']}</h1>
                     <p style="font-size: 1.5rem;">Confidence: {result['confidence']:.1%}</p>
+                    <p style="font-size: 1.2rem;">{result['confidence_level']} Confidence</p>
                 </div>
                 """, unsafe_allow_html=True)
                 
+                # Action recommendation
+                if result['decision'] == "PASS":
+                    st.success(f"✅ **Action**: Auto-approve (Confidence < {pass_threshold:.0%})")
+                elif result['decision'] == "REJECT":
+                    st.error(f"❌ **Action**: Auto-reject (Confidence > {reject_threshold:.0%})")
+                else:
+                    st.warning(f"⚠️ **Action**: Manual review required (Uncertain range {pass_threshold:.0%} - {reject_threshold:.0%})")
+                
                 # Metrics
-                metric_cols = st.columns(3)
+                metric_cols = st.columns(4)
                 with metric_cols[0]:
                     st.metric("Max Probability", f"{result['confidence']:.1%}")
                 with metric_cols[1]:
                     st.metric("Mean Probability", f"{result['mean_prob']:.1%}")
                 with metric_cols[2]:
-                    st.metric("Defective Patches", f"{result['n_defective']}/{result['total_patches']}")
+                    st.metric("Auto-Pass Patches", f"{result['n_auto_pass']}/{result['total_patches']}")
+                with metric_cols[3]:
+                    st.metric("Auto-Reject Patches", f"{result['n_auto_reject']}/{result['total_patches']}")
+                
+                # Zone breakdown
+                st.markdown("#### Patch Distribution by Zone")
+                zone_cols = st.columns(3)
+                with zone_cols[0]:
+                    st.success(f"🟢 Auto-Pass: {result['n_auto_pass']} ({result['n_auto_pass']/result['total_patches']*100:.1f}%)")
+                with zone_cols[1]:
+                    st.warning(f"⚠️ Manual Review: {result['n_manual_review']} ({result['n_manual_review']/result['total_patches']*100:.1f}%)")
+                with zone_cols[2]:
+                    st.error(f"🔴 Auto-Reject: {result['n_auto_reject']} ({result['n_auto_reject']/result['total_patches']*100:.1f}%)")
                 
                 # Patch analysis
                 with st.expander("📊 Detailed Patch Analysis"):
                     st.markdown("**Patch-level Probabilities:**")
                     
-                    # Create heatmap-style visualization
+                    # Create traffic light visualization
                     import matplotlib.pyplot as plt
                     
                     fig, ax = plt.subplots(figsize=(10, 2))
-                    ax.bar(range(len(result['patch_probs'])), result['patch_probs'], 
-                           color=['red' if p > threshold else 'green' for p in result['patch_probs']])
-                    ax.axhline(y=threshold, color='orange', linestyle='--', label=f'Threshold ({threshold})')
+                    colors = ['green' if p < pass_threshold else 'orange' if p <= reject_threshold else 'red' 
+                             for p in result['patch_probs']]
+                    ax.bar(range(len(result['patch_probs'])), result['patch_probs'], color=colors)
+                    ax.axhline(y=pass_threshold, color='green', linestyle='--', linewidth=2, label=f'Pass Threshold ({pass_threshold})')
+                    ax.axhline(y=reject_threshold, color='red', linestyle='--', linewidth=2, label=f'Reject Threshold ({reject_threshold})')
                     ax.set_xlabel('Patch Index')
                     ax.set_ylabel('Defect Probability')
                     ax.legend()
@@ -398,7 +450,7 @@ def main():
     st.markdown("""
     <div style="text-align: center; color: rgba(255,255,255,0.5); padding: 1rem;">
         <p>Steel Defect Detection System | Built with ❤️ using Deep Learning</p>
-        <p>EfficientNetB0 Transfer Learning | 97.5% Recall | Production Threshold: 0.50</p>
+        <p>EfficientNetB0 Transfer Learning | Traffic Light Logic | Data-Driven Thresholds</p>
     </div>
     """, unsafe_allow_html=True)
 
