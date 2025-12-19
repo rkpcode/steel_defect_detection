@@ -222,8 +222,7 @@ class TrainingPipeline:
             train_path=train_path,
             test_path=test_path,
             max_train_images=max_train_images,
-            max_test_images=max_test_images,
-            memory_efficient=memory_efficient
+            max_test_images=max_test_images
         )
         
         # Step 3: Model Training
