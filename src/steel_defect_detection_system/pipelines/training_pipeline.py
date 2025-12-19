@@ -186,20 +186,20 @@ class TrainingPipeline:
         
         try:
             model = training_result['model']
-            X_test = transformation_result['X_test']
-            y_test = transformation_result['y_test']
+            test_dataset = transformation_result['test_dataset']
+            validation_steps = transformation_result['test_patches'] // self.transformation_config.batch_size
             
             evaluator = ModelEvaluation()
             result = evaluator.initiate_model_evaluation(
                 model=model,
-                X_test=X_test,
-                y_test=y_test
+                test_dataset=test_dataset,
+                validation_steps=validation_steps
             )
             
             logger.info(f"\n[OK] Step 4 Complete!")
-            logger.info(f"   Default threshold recall: {result['metrics_default']['recall']:.4f}")
-            logger.info(f"   Optimal threshold: {result['optimal_threshold']:.3f}")
-            logger.info(f"   Optimal recall: {result['metrics_optimal']['recall']:.4f}")
+            logger.info(f"   Test Recall: {result.get('recall', 0):.4f}")
+            logger.info(f"   Test Precision: {result.get('precision', 0):.4f}")
+            logger.info(f"   Test F2-Score: {result.get('f2_score', 0):.4f}")
             
             return result
             

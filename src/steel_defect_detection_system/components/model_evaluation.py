@@ -34,8 +34,8 @@ from sklearn.metrics import (
 )
 import tensorflow as tf
 
-from steel_defect_detection_system.exception import CustomException
-from steel_defect_detection_system.logger import logger
+from src.steel_defect_detection_system.exception import CustomException
+from src.steel_defect_detection_system.logger import logger
 
 
 @dataclass
@@ -360,15 +360,15 @@ class ModelEvaluation:
         return report
     
     def initiate_model_evaluation(self, model: tf.keras.Model,
-                                   X_test: np.ndarray,
-                                   y_test: np.ndarray) -> Dict:
+                                   test_dataset: tf.data.Dataset,
+                                   validation_steps: int) -> Dict:
         """
         Main method to run complete model evaluation.
         
         Args:
             model: Trained Keras model
-            X_test: Test images
-            y_test: Test labels
+            test_dataset: Test tf.data.Dataset
+            validation_steps: Number of validation steps
         
         Returns:
             Dictionary with all evaluation results
@@ -378,56 +378,23 @@ class ModelEvaluation:
             logger.info("STARTING MODEL EVALUATION")
             logger.info("=" * 60)
             
-            # Generate predictions
-            y_pred_proba, y_pred_binary = self.predict(model, X_test)
+            # Evaluate model on test dataset
+            logger.info(f"Evaluating on {validation_steps} batches...")
+            results = model.evaluate(test_dataset, steps=validation_steps, verbose=1, return_dict=True)
             
-            # Metrics at default threshold
-            logger.info("\n--- Metrics at Default Threshold (0.5) ---")
-            metrics_default = self.calculate_metrics(y_test, y_pred_binary, y_pred_proba)
-            metrics_default['threshold'] = 0.5
-            
-            # Find optimal threshold
-            logger.info("\n--- Finding Optimal Threshold ---")
-            optimal_threshold, metrics_optimal = self.find_optimal_threshold(
-                y_test, y_pred_proba
-            )
-            
-            # Generate predictions at optimal threshold
-            y_pred_optimal = (y_pred_proba >= optimal_threshold).astype(int)
-            
-            # Plot confusion matrices
-            self.plot_confusion_matrix(
-                y_test, y_pred_binary, threshold=0.5,
-                save_path=os.path.join(self.config.plots_dir, 'confusion_matrix_default.png')
-            )
-            self.plot_confusion_matrix(
-                y_test, y_pred_optimal, threshold=optimal_threshold,
-                save_path=os.path.join(self.config.plots_dir, 'confusion_matrix_optimal.png')
-            )
-            
-            # Plot PR curve
-            self.plot_precision_recall_curve(
-                y_test, y_pred_proba, optimal_threshold=optimal_threshold,
-                save_path=os.path.join(self.config.plots_dir, 'precision_recall_curve.png')
-            )
-            
-            # Generate report
-            report = self.generate_evaluation_report(
-                metrics_default, metrics_optimal,
-                save_path=os.path.join(self.config.evaluation_dir, 'phase5_evaluation_report.md')
-            )
+            logger.info("\n--- Test Set Metrics ---")
+            logger.info(f"  Loss: {results.get('loss', 0):.4f}")
+            logger.info(f"  Accuracy: {results.get('accuracy', 0):.4f}")
+            logger.info(f"  Precision: {results.get('precision', 0):.4f}")
+            logger.info(f"  Recall: {results.get('recall', 0):.4f}")
+            logger.info(f"  AUC: {results.get('auc', 0):.4f}")
+            logger.info(f"  F2-Score: {results.get('f2_score', 0):.4f}")
             
             logger.info("=" * 60)
             logger.info("MODEL EVALUATION COMPLETE")
             logger.info("=" * 60)
             
-            return {
-                'metrics_default': metrics_default,
-                'metrics_optimal': metrics_optimal,
-                'optimal_threshold': optimal_threshold,
-                'y_pred_proba': y_pred_proba,
-                'report': report
-            }
+            return results
             
         except Exception as e:
             raise CustomException(e, sys)
