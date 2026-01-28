@@ -383,24 +383,35 @@ def main():
             
             if result:
                 # Decision card with traffic light logic
-                decision_emoji = {"PASS": "✅", "REJECT": "❌", "REVIEW": "⚠️"}
-                decision_color = {"PASS": "green", "REJECT": "red", "REVIEW": "orange"}
+                if result['decision'] == "PASS":
+                    status_text = "🟢 CLEAN STEEL"
+                    action_text = f"Auto-Pass (Confidence < {pass_threshold:.0%})"
+                    card_subtext = "No defects detected"
+                elif result['decision'] == "REJECT":
+                    status_text = "🔴 DEFECT CONFIRMED"
+                    action_text = f"Auto-Reject (Confidence > {reject_threshold:.0%})"
+                    card_subtext = "Defect detected with high confidence"
+                else:
+                    status_text = "⚠️ AMBIGUOUS / UNCERTAIN"
+                    action_text = "👨‍🔧 OPERATOR REVIEW REQUIRED"
+                    card_subtext = f"Confidence in gray zone ({pass_threshold:.0%} - {reject_threshold:.0%})"
                 
+                # Display Result Card
                 st.markdown(f"""
                 <div class="result-card {result['decision_class']}">
-                    <h1>{decision_emoji[result['decision']]} {result['decision']}</h1>
+                    <h1>{status_text}</h1>
                     <p style="font-size: 1.5rem;">Confidence: {result['confidence']:.1%}</p>
-                    <p style="font-size: 1.2rem;">{result['confidence_level']} Confidence</p>
+                    <p style="font-size: 1.2rem;">{card_subtext}</p>
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # Action recommendation
+                # Action recommendation (Using st.info as requested, or colored boxes)
                 if result['decision'] == "PASS":
-                    st.success(f"✅ **Action**: Auto-approve (Confidence < {pass_threshold:.0%})")
+                    st.success(f"**Recommended Action**: {action_text}")
                 elif result['decision'] == "REJECT":
-                    st.error(f"❌ **Action**: Auto-reject (Confidence > {reject_threshold:.0%})")
+                    st.error(f"**Recommended Action**: {action_text}")
                 else:
-                    st.warning(f"⚠️ **Action**: Manual review required (Uncertain range {pass_threshold:.0%} - {reject_threshold:.0%})")
+                    st.info(f"**Recommended Action**: {action_text}")
                 
                 # Metrics
                 metric_cols = st.columns(4)
